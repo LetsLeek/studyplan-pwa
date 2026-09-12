@@ -1,16 +1,16 @@
 // Service Worker: Offline-Fallback für die App-Shell (App-State bleibt in localStorage).
 // Strategie: network-first für App-Code (HTML/CSS/JS), damit Updates sofort ankommen;
 // cache-first nur für Icons, die sich praktisch nie ändern.
-const CACHE = "studyplan-v2";
+const CACHE = "studyplan-v3";
 const ASSETS = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
   "./css/styles.css",
-  "./js/store.js",
-  "./js/calendar.js",
-  "./js/icons.js",
-  "./js/app.js",
+  "./js/store.js?v=3",
+  "./js/calendar.js?v=3",
+  "./js/icons.js?v=3",
+  "./js/app.js?v=3",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/apple-touch-icon.png",
