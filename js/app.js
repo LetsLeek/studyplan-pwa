@@ -385,6 +385,21 @@ function renderSettings() {
       </div>
     </div>
 
+    <div class="section-title">U:SPACE Kalender-Abo</div>
+    <div class="field-group">
+      <div class="field-row stacked">
+        <label>Persönlicher Abo-Link</label>
+        <input id="settingIcsUrl" placeholder="https://ucal.univie.ac.at/…" value="${escapeHtml(s.icsUrl || "")}" />
+      </div>
+    </div>
+    <div class="empty-state" style="padding:4px 8px 16px;text-align:left">
+      <div class="hint">Findest du in u:space unter <em>Startseite → Kalender → Abonnieren → Link generieren</em>. Halte den Link privat, damit sieht man deinen Stundenplan. Er wird nur auf diesem Gerät gespeichert.</div>
+    </div>
+    ${s.icsUrl ? `
+      <button class="btn-block primary" id="openIcsBtn">In Kalender-App öffnen</button>
+      <button class="btn-block secondary" id="copyIcsBtn">Link kopieren</button>
+    ` : ""}
+
     <div class="section-title">Daten</div>
     <button class="btn-block secondary" id="exportBtn">Backup exportieren (JSON)</button>
     <button class="btn-block secondary" id="importBtn">Backup importieren</button>
@@ -753,6 +768,27 @@ function attachGlobalHandlers() {
   bindSettingInput("settingUniversity", "university");
   bindSettingInput("settingSemStart", "semesterStart");
   bindSettingInput("settingSemEnd", "semesterEnd");
+
+  const icsInput = document.getElementById("settingIcsUrl");
+  if (icsInput) icsInput.addEventListener("change", () => {
+    store.updateSettings({ icsUrl: icsInput.value.trim() || null });
+    render();
+  });
+  const openIcsBtn = document.getElementById("openIcsBtn");
+  if (openIcsBtn) openIcsBtn.addEventListener("click", () => {
+    const url = store.data.settings.icsUrl;
+    if (!url) return;
+    window.location.href = url.replace(/^https?:\/\//, "webcal://");
+  });
+  const copyIcsBtn = document.getElementById("copyIcsBtn");
+  if (copyIcsBtn) copyIcsBtn.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(store.data.settings.icsUrl || "");
+      toast("Link kopiert");
+    } catch {
+      toast("Kopieren nicht möglich – Link manuell markieren");
+    }
+  });
 
   const exportBtn = document.getElementById("exportBtn");
   if (exportBtn) exportBtn.addEventListener("click", doExport);

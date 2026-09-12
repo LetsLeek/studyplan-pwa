@@ -41,6 +41,7 @@ function defaultData() {
       semesterStart: null,
       semesterEnd: null,
       university: "Universität Wien",
+      icsUrl: null, // persönlicher U:SPACE-Kalender-Abo-Link, bleibt nur lokal auf diesem Gerät
     },
     courses: [],
     events: [],
