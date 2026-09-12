@@ -1,5 +1,7 @@
-// Service Worker: Offline-Cache für die App-Shell (App-State bleibt in localStorage, hier nur Assets).
-const CACHE = "studyplan-v1";
+// Service Worker: Offline-Fallback für die App-Shell (App-State bleibt in localStorage).
+// Strategie: network-first für App-Code (HTML/CSS/JS), damit Updates sofort ankommen;
+// cache-first nur für Icons, die sich praktisch nie ändern.
+const CACHE = "studyplan-v2";
 const ASSETS = [
   "./",
   "./index.html",
@@ -13,6 +15,8 @@ const ASSETS = [
   "./icons/icon-512.png",
   "./icons/apple-touch-icon.png",
 ];
+
+const ICON_PATTERN = /\/icons\//;
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -30,18 +34,23 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+
+  if (ICON_PATTERN.test(event.request.url)) {
+    event.respondWith(
+      caches.match(event.request).then((cached) => cached || fetch(event.request))
+    );
+    return;
+  }
+
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const network = fetch(event.request)
-        .then((res) => {
-          if (res.ok) {
-            const clone = res.clone();
-            caches.open(CACHE).then((cache) => cache.put(event.request, clone));
-          }
-          return res;
-        })
-        .catch(() => cached);
-      return cached || network;
-    })
+    fetch(event.request)
+      .then((res) => {
+        if (res.ok) {
+          const clone = res.clone();
+          caches.open(CACHE).then((cache) => cache.put(event.request, clone));
+        }
+        return res;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
