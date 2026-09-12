@@ -1,5 +1,6 @@
 // Lokale Datenschicht — alles bleibt auf dem Gerät (localStorage), kein Server.
 const DB_KEY = "studyplan:v1";
+const SYNC_KEY = "studyplan:synced:v1";
 
 const WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 
@@ -42,6 +43,7 @@ function defaultData() {
       semesterEnd: null,
       university: "Universität Wien",
       icsUrl: null, // persönlicher U:SPACE-Kalender-Abo-Link, bleibt nur lokal auf diesem Gerät
+      syncUrl: null, // Gist-JSON-URL für automatischen Kurs-Sync in die App
     },
     courses: [],
     events: [],
@@ -53,6 +55,7 @@ class Store {
   constructor() {
     this.data = this._load();
     this._listeners = new Set();
+    this._syncCache = this._loadSyncCache();
   }
 
   _load() {
@@ -196,6 +199,45 @@ class Store {
   clearAll() {
     this.data = defaultData();
     this._save();
+  }
+
+  // --- Automatischer Kurs-Sync (read-only, aus externem Gist-JSON) ---
+  _loadSyncCache() {
+    try {
+      const raw = localStorage.getItem(SYNC_KEY);
+      return raw ? JSON.parse(raw) : { fetchedAt: null, events: [] };
+    } catch {
+      return { fetchedAt: null, events: [] };
+    }
+  }
+
+  getSyncedEvents() {
+    return this._syncCache.events;
+  }
+
+  getSyncMeta() {
+    return { fetchedAt: this._syncCache.fetchedAt, count: this._syncCache.events.length };
+  }
+
+  async syncNow() {
+    const url = this.data.settings.syncUrl;
+    if (!url) throw new Error("Keine Sync-URL hinterlegt.");
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    if (!Array.isArray(json.events)) throw new Error("Unerwartetes Format.");
+    this._syncCache = { fetchedAt: new Date().toISOString(), events: json.events };
+    localStorage.setItem(SYNC_KEY, JSON.stringify(this._syncCache));
+    this._emit();
+    return this._syncCache;
+  }
+
+  syncIfStale(maxAgeMs = 30 * 60 * 1000) {
+    if (!this.data.settings.syncUrl) return;
+    const last = this._syncCache.fetchedAt ? new Date(this._syncCache.fetchedAt).getTime() : 0;
+    if (Date.now() - last > maxAgeMs) {
+      this.syncNow().catch((err) => console.error("StudyPlan: Sync fehlgeschlagen", err));
+    }
   }
 }
 

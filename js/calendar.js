@@ -46,12 +46,41 @@ function eventsForDate(events, dateISO) {
     .map((e) => ({ kind: "event", ...e }));
 }
 
-// Alle Termine (Kurs-Sitzungen + Events) eines Tages, zeitlich sortiert.
+// Synchronisierte Termine (read-only, aus dem U:SPACE-Auto-Sync) laufen über lokale Zeit,
+// damit Datum/Uhrzeit auch bei UTC-Zeitstempeln korrekt in der Gerätezeit erscheinen.
+function syncedLocalDate(ev) {
+  return ev.allDay ? ev.start : isoDate(new Date(ev.start));
+}
+
+function syncedLocalTime(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+function syncedEventsForDate(store, dateISO) {
+  return store
+    .getSyncedEvents()
+    .filter((ev) => syncedLocalDate(ev) === dateISO)
+    .map((ev) => ({
+      kind: "synced",
+      id: ev.uid,
+      title: ev.title,
+      location: ev.location,
+      syncKind: ev.kind, // "lecture" | "info"
+      allDay: ev.allDay,
+      time: ev.allDay ? null : syncedLocalTime(ev.start),
+      endTime: ev.allDay ? null : syncedLocalTime(ev.end),
+    }));
+}
+
+// Alle Termine (Kurs-Sitzungen + Events + Auto-Sync) eines Tages, zeitlich sortiert.
 function agendaForDate(store, dateISO) {
   const { courses, events, settings } = store.data;
   const items = [
     ...courseSessionsForDate(courses, dateISO, settings),
     ...eventsForDate(events, dateISO),
+    ...syncedEventsForDate(store, dateISO),
   ];
   items.sort((a, b) => {
     const ta = a.time || "99:99";

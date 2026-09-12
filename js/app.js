@@ -198,7 +198,25 @@ function agendaRow(item) {
       </div>
     `;
   }
+  if (item.kind === "synced") return syncedRow(item);
   return eventRow(item, true);
+}
+
+function syncedRow(item) {
+  const isLecture = item.syncKind === "lecture";
+  return `
+    <div class="list-row">
+      <div class="color-bar" style="background:var(--text-tertiary)"></div>
+      <div style="flex:1">
+        <div class="row-title">${escapeHtml(item.title)}</div>
+        <div class="row-sub">
+          <span class="badge other">${isLecture ? "Sync" : "U:SPACE"}</span>
+          ${item.location ? " · " + escapeHtml(item.location) : ""}
+        </div>
+      </div>
+      <div class="row-time">${item.time || ""}</div>
+    </div>
+  `;
 }
 
 function eventRow(e, compact = false) {
@@ -344,6 +362,16 @@ function renderMaterials() {
 
 // ---------------- Settings ----------------
 
+function renderSyncStatus() {
+  const meta = store.getSyncMeta();
+  if (!store.data.settings.syncUrl) {
+    return "Automatischer Sync deiner U:SPACE-Termine direkt in StudyPlan (read-only). Die Sync-URL bekommst du von mir, sobald der Hintergrund-Job eingerichtet ist.";
+  }
+  if (!meta.fetchedAt) return "Noch nicht synchronisiert. Tippe auf \"Jetzt synchronisieren\".";
+  const d = new Date(meta.fetchedAt);
+  return `Zuletzt synchronisiert: ${d.toLocaleString("de-AT")} · ${meta.count} Termine`;
+}
+
 function renderSettings() {
   const s = store.data.settings;
   return `
@@ -399,6 +427,18 @@ function renderSettings() {
       <button class="btn-block primary" id="openIcsBtn">In Kalender-App öffnen</button>
       <button class="btn-block secondary" id="copyIcsBtn">Link kopieren</button>
     ` : ""}
+
+    <div class="section-title">Automatischer Kurs-Sync</div>
+    <div class="field-group">
+      <div class="field-row stacked">
+        <label>Sync-URL</label>
+        <input id="settingSyncUrl" placeholder="https://gist.githubusercontent.com/…" value="${escapeHtml(s.syncUrl || "")}" />
+      </div>
+    </div>
+    <div class="empty-state" style="padding:4px 8px 16px;text-align:left">
+      <div class="hint">${renderSyncStatus()}</div>
+    </div>
+    ${s.syncUrl ? `<button class="btn-block secondary" id="syncNowBtn">Jetzt synchronisieren</button>` : ""}
 
     <div class="section-title">Daten</div>
     <button class="btn-block secondary" id="exportBtn">Backup exportieren (JSON)</button>
@@ -790,6 +830,23 @@ function attachGlobalHandlers() {
     }
   });
 
+  const syncUrlInput = document.getElementById("settingSyncUrl");
+  if (syncUrlInput) syncUrlInput.addEventListener("change", () => {
+    store.updateSettings({ syncUrl: syncUrlInput.value.trim() || null });
+    render();
+  });
+  const syncNowBtn = document.getElementById("syncNowBtn");
+  if (syncNowBtn) syncNowBtn.addEventListener("click", async () => {
+    syncNowBtn.textContent = "Synchronisiere…";
+    try {
+      await store.syncNow();
+      toast("Synchronisiert");
+    } catch (err) {
+      toast("Sync fehlgeschlagen: " + err.message);
+    }
+    render();
+  });
+
   const exportBtn = document.getElementById("exportBtn");
   if (exportBtn) exportBtn.addEventListener("click", doExport);
   const importBtn = document.getElementById("importBtn");
@@ -877,7 +934,9 @@ function applyTheme() {
 
 applyTheme();
 render();
-store.subscribe(() => {}); // reserved for future cross-tab sync
+store.subscribe(() => render());
+
+store.syncIfStale();
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
