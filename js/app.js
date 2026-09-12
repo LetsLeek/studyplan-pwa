@@ -849,13 +849,15 @@ function doImport(e) {
   const reader = new FileReader();
   reader.onload = () => {
     try {
-      store.importJSON(reader.result);
+      const text = reader.result.replace(/^﻿/, "").trim();
+      store.importJSON(text);
       toast("Backup importiert");
       render();
     } catch (err) {
-      alert("Ungültige Backup-Datei.");
+      alert("Ungültige Backup-Datei:\n" + err.message);
     }
   };
+  reader.onerror = () => alert("Datei konnte nicht gelesen werden.");
   reader.readAsText(file);
   e.target.value = "";
 }
